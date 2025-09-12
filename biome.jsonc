@@ -1,0 +1,45 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
+  "extends": ["ultracite"],
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double"
+    }
+  },
+  "linter": {
+    "includes": ["**", "!bun.lock"],
+    "rules": {
+      "a11y": {
+        "useSemanticElements": "off",
+        "useAriaPropsForRole": "off",
+        "useFocusableInteractive": "off",
+        "noStaticElementInteractions": "off",
+        "useKeyWithClickEvents": "off",
+        "noNoninteractiveElementInteractions": "off"
+      },
+      "correctness": {
+        "noInvalidPositionAtImportRule": "off"
+      },
+      "nursery": {
+        "useAnchorHref": "off",
+        "useConsistentTypeDefinitions": "off"
+      },
+      "performance": {
+        "noBarrelFile": "off"
+      },
+      "style": {
+        "noMagicNumbers": "off"
+      },
+      "suspicious": {
+        "noConsole": "off",
+        "noUnknownAtRules": "off"
+      }
+    }
+  }
+}

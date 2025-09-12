@@ -1,0 +1,35 @@
+{
+  "name": "brsr",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "lint:fix:unsafe": "biome check --write --unsafe .",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.4",
+    "@tauri-apps/cli": "^2.0.0-rc.18",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.21",
+    "globals": "^16.3.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.8.3",
+    "ultracite": "5.3.4",
+    "vite": "^6.3.6"
+  }
+}
