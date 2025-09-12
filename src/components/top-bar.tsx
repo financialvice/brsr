@@ -36,11 +36,11 @@ export function TopBar({
   };
 
   return (
-    <div className="flex h-12 items-center space-x-2 border-gray-200 border-b bg-gray-50 px-3">
+    <div className="flex h-12 items-center space-x-2 border-gray-200 border-b px-3">
       <button
         className={`rounded p-1.5 ${
           canGoBack
-            ? "cursor-pointer text-gray-700 hover:bg-gray-200"
+            ? "cursor-pointer text-gray-700 hover:bg-gray-200/50"
             : "cursor-not-allowed text-gray-400"
         }`}
         disabled={!canGoBack}
@@ -53,7 +53,7 @@ export function TopBar({
       <button
         className={`rounded p-1.5 ${
           canGoForward
-            ? "cursor-pointer text-gray-700 hover:bg-gray-200"
+            ? "cursor-pointer text-gray-700 hover:bg-gray-200/50"
             : "cursor-not-allowed text-gray-400"
         }`}
         disabled={!canGoForward}
@@ -64,7 +64,7 @@ export function TopBar({
         →
       </button>
       <button
-        className="rounded p-1.5 text-gray-700 hover:bg-gray-200"
+        className="rounded p-1.5 text-gray-700 hover:bg-gray-200/50"
         onClick={onReload}
         title="Reload"
         type="button"
@@ -74,7 +74,7 @@ export function TopBar({
 
       <form className="flex-1" onSubmit={handleSubmit}>
         <input
-          className="w-full rounded-md border border-gray-300 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-md border border-gray-300 bg-white/50 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
           onChange={(e) => setUrlInput(e.target.value)}
           placeholder="Enter URL..."
           type="text"

@@ -10,6 +10,8 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Browser",
@@ -17,7 +19,11 @@
         "width": 1280,
         "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "transparent": true,
+        "decorations": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "overlay"
       }
     ],
     "security": {

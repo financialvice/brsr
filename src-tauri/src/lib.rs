@@ -1,4 +1,11 @@
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
+use tauri_plugin_decorum::WebviewWindowExt;
+
+#[cfg(target_os = "macos")]
+use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+
+#[cfg(target_os = "windows")]
+use window_vibrancy::{apply_mica, apply_acrylic};
 
 #[tauri::command]
 async fn create_browser_webview(
@@ -253,6 +260,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_decorum::init())
         .invoke_handler(tauri::generate_handler![
             create_browser_webview,
             show_webview,
@@ -269,6 +277,37 @@ pub fn run() {
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
             println!("[Rust] Main window created, label: {}", main_window.label());
+            
+            // Create custom overlay titlebar for decorum
+            main_window.create_overlay_titlebar()
+                .expect("Failed to create overlay titlebar");
+            
+            // Apply vibrancy effect based on platform
+            #[cfg(target_os = "macos")]
+            {
+                // Set custom inset for traffic lights (x, y offset)
+                main_window.set_traffic_lights_inset(12.0, 16.0)
+                    .expect("Failed to set traffic lights inset");
+                
+                // Use HudWindow for a dark, glassy effect
+                // Other options: Sidebar, UnderWindowBackground, UnderPageBackground, etc.
+                apply_vibrancy(&main_window, NSVisualEffectMaterial::HudWindow, None, None)
+                    .expect("Failed to apply window vibrancy on macOS");
+                println!("[Rust] Applied vibrancy effect and traffic lights inset on macOS");
+            }
+            
+            #[cfg(target_os = "windows")]
+            {
+                // Try Mica for Windows 11, fall back to Acrylic
+                if apply_mica(&main_window, None).is_err() {
+                    // Fallback to Acrylic with a dark tint
+                    apply_acrylic(&main_window, Some((18, 18, 18, 125)))
+                        .expect("Failed to apply window vibrancy on Windows");
+                    println!("[Rust] Applied Acrylic effect on Windows");
+                } else {
+                    println!("[Rust] Applied Mica effect on Windows");
+                }
+            }
             
             // List all webviews
             let webviews = main_window.webviews();

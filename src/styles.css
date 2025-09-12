@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Make html and body transparent to show window vibrancy */
+html, body {
+  background: transparent;
+}

@@ -292,7 +292,7 @@ function App() {
   }, [activeTab]);
 
   return (
-    <div className="flex h-screen flex-col bg-white">
+    <div className="flex h-screen flex-col">
       <TopBar
         canGoBack={navState.canGoBack}
         canGoForward={navState.canGoForward}

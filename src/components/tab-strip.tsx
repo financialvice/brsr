@@ -16,14 +16,14 @@ export function TabStrip({
   onNewTab,
 }: TabStripProps) {
   return (
-    <div className="flex items-center overflow-x-auto border-gray-200 border-b bg-gray-100 px-2 py-1">
+    <div className="flex items-center overflow-x-auto border-gray-200 border-b px-2 py-1">
       <div className="flex items-center space-x-1">
         {tabs.map((tab) => (
           <div
             className={`flex cursor-pointer items-center rounded-t-lg px-3 py-1.5 ${
               tab.id === activeTabId
-                ? "border-gray-300 border-t border-r border-l bg-white font-semibold"
-                : "border border-transparent bg-gray-50 hover:bg-gray-100"
+                ? "border-gray-300 border-t border-r border-l bg-white/70 font-semibold"
+                : "border border-transparent bg-white/30 hover:bg-white/50"
             }min-w-[120px] max-w-[200px]`}
             key={tab.id}
             onClick={() => onTabClick(tab.id)}
@@ -44,7 +44,7 @@ export function TabStrip({
           </div>
         ))}
         <button
-          className="rounded px-2 py-1 text-gray-600 hover:bg-gray-200"
+          className="rounded px-2 py-1 text-gray-600 hover:bg-gray-200/50"
           onClick={onNewTab}
           type="button"
         >
