@@ -252,6 +252,7 @@ async fn check_navigation_state(window: tauri::Window, label: String) -> Result<
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             create_browser_webview,
             show_webview,
