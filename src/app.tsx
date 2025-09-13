@@ -313,7 +313,7 @@ function App() {
 
       <div className="flex flex-1">
         <WebviewContainer activeTabId={state.activeTabId} tabs={state.tabs} />
-        <AssistantPanel />
+        <AssistantPanel activeWebviewLabel={activeTab?.webviewLabel ?? null} />
       </div>
     </div>
   );

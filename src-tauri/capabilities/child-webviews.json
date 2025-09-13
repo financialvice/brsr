@@ -1,0 +1,9 @@
+{
+  "identifier": "child-webviews-emit-only",
+  "description": "Permit remote child webviews to emit events to the main window (telemetry bridge).",
+  "webviews": ["webview-*"],
+  "remote": {
+    "urls": ["https://*", "http://*"]
+  },
+  "permissions": ["core:event:default"]
+}

@@ -100,7 +100,7 @@ export function TabStrip({
   onNewTab,
 }: TabStripProps) {
   return (
-    <div className="flex items-center overflow-x-auto border-gray-200 border-b px-2 py-1">
+    <div className="flex shrink-0 items-center overflow-x-auto border-gray-200 border-b px-2 py-1">
       <div className="flex items-center space-x-1">
         {tabs.map((tab) => (
           <div

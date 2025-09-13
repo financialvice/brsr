@@ -27,10 +27,180 @@ async fn create_browser_webview(
     let logical_pos = LogicalPosition::new(x, y);
     let logical_size = LogicalSize::new(width, height);
 
-    // Simple script to emit navigation events when the page loads
+    // Inject a lightweight telemetry script into every webview.
+    // It streams page info, basic performance, network metadata, console/error signals, and selection snippets
+    // back to the main window via Tauri's event API. This is an initial prototype and intentionally minimal.
     let navigation_script = format!(r#"
-        console.log('[Webview {}] Initialization script running');
-    "#, label);
+        (() => {{
+          const LABEL = {label:?};
+          const toMain = async (event, payload) => {{
+            try {{
+              const p = Object.assign({{ label: LABEL, ts: Date.now() }}, payload);
+              if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.emitTo) {{
+                await window.__TAURI__.event.emitTo('main', event, p);
+              }} else if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.emit) {{
+                await window.__TAURI__.event.emit(event, p);
+              }}
+            }} catch (_) {{}}
+          }};
+
+          const limit = (arr, n = 25) => arr.slice(-n);
+          let recentLogs = [];
+          let lastSelection = '';
+
+          const snapshot = () => {{
+            try {{
+              const metas = {{}};
+              for (const m of document.querySelectorAll('meta[name][content], meta[property][content]')) {{
+                const key = m.getAttribute('name') || m.getAttribute('property');
+                if (key && !(key in metas)) metas[key] = m.getAttribute('content') || '';
+              }}
+              const links = Array.from(document.querySelectorAll('a[href]')).slice(0, 200).map(a => ({{
+                href: a.href,
+                text: (a.textContent || '').trim().slice(0, 140),
+              }}));
+              const headings = Array.from(document.querySelectorAll('h1,h2,h3')).slice(0, 50).map(h => ({{
+                tag: h.tagName,
+                text: (h.textContent || '').trim().slice(0, 160),
+              }}));
+              const icons = Array.from(document.querySelectorAll('link[rel~="icon"]')).map(l => l.href);
+              const themeColor = (document.querySelector('meta[name="theme-color"]')?.content || null);
+              toMain('webview-telemetry', {{
+                kind: 'page-info',
+                title: document.title,
+                url: location.href,
+                lang: document.documentElement.getAttribute('lang') || null,
+                metas,
+                icons,
+                themeColor,
+                links,
+                headings,
+              }});
+            }} catch (_) {{}}
+          }};
+
+          // initial snapshot and on DOMContentLoaded
+          if (document.readyState !== 'loading') snapshot();
+          document.addEventListener('DOMContentLoaded', snapshot, {{ once: true }});
+
+          // selection changes
+          document.addEventListener('selectionchange', () => {{
+            try {{
+              const sel = window.getSelection();
+              const text = (sel && sel.toString()) ? sel.toString().trim().slice(0, 500) : '';
+              if (text && text !== lastSelection) {{
+                lastSelection = text;
+                toMain('webview-telemetry', {{ kind: 'selection', text }});
+              }}
+            }} catch (_) {{}}
+          }});
+
+          // Performance observers
+          try {{
+            const perfHandler = (list) => {{
+              for (const e of list.getEntries()) {{
+                if (e.entryType === 'resource') {{
+                  toMain('webview-telemetry', {{ kind: 'resource', item: {{
+                    type: e.initiatorType,
+                    name: e.name,
+                    duration: e.duration,
+                    startTime: e.startTime,
+                    transferSize: e.transferSize,
+                  }} }});
+                }} else if (e.entryType === 'paint') {{
+                  toMain('webview-telemetry', {{ kind: 'paint', name: e.name, startTime: e.startTime }});
+                }} else if (e.entryType === 'largest-contentful-paint') {{
+                  toMain('webview-telemetry', {{ kind: 'lcp', startTime: e.startTime, size: e.size, url: e.url || null }});
+                }} else if (e.entryType === 'navigation') {{
+                  toMain('webview-telemetry', {{ kind: 'navigation', domContentLoaded: e.domContentLoadedEventEnd, loadEventEnd: e.loadEventEnd, type: e.type }});
+                }} else if (e.entryType === 'longtask') {{
+                  toMain('webview-telemetry', {{ kind: 'longtask', startTime: e.startTime, duration: e.duration }});
+                }}
+              }}
+            }};
+            const po = new PerformanceObserver(perfHandler);
+            po.observe({{ entryTypes: ['resource', 'paint', 'largest-contentful-paint', 'navigation', 'longtask'] }});
+          }} catch (_) {{}}
+
+          // Wrap fetch
+          try {{
+            const origFetch = window.fetch;
+            window.fetch = async (...args) => {{
+              const started = performance.now();
+              const input = args[0];
+              const info = args[1] || {{}};
+              const url = (typeof input === 'string') ? input : input.url;
+              const method = (info && info.method) || (typeof input !== 'string' && input.method) || 'GET';
+              try {{
+                const res = await origFetch(...args);
+                const ended = performance.now();
+                let preview = null;
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {{
+                  try {{ preview = JSON.stringify(await res.clone().json()).slice(0, 2000); }} catch (_) {{}}
+                }} else if (ct.startsWith('text/')) {{
+                  try {{ preview = (await res.clone().text()).slice(0, 2000); }} catch (_) {{}}
+                }}
+                toMain('webview-telemetry', {{ kind: 'fetch', url, method, status: res.status, duration: ended - started, preview }});
+                return res;
+              }} catch (err) {{
+                const ended = performance.now();
+                toMain('webview-telemetry', {{ kind: 'fetch-error', url, method, error: String(err), duration: ended - started }});
+                throw err;
+              }}
+            }};
+          }} catch (_) {{}}
+
+          // Wrap XHR
+          try {{
+            const OrigXHR = window.XMLHttpRequest;
+            function XHR() {{
+              const xhr = new OrigXHR();
+              let url = '';
+              let method = 'GET';
+              let started = 0;
+              const origOpen = xhr.open;
+              const origSend = xhr.send;
+              xhr.open = function(m, u, ...rest) {{ method = m; url = u; return origOpen.call(this, m, u, ...rest); }};
+              xhr.send = function(...rest) {{ started = performance.now(); return origSend.apply(this, rest); }};
+              xhr.addEventListener('loadend', function() {{
+                const ended = performance.now();
+                toMain('webview-telemetry', {{ kind: 'xhr', url, method, status: xhr.status, duration: ended - started }});
+              }});
+              return xhr;
+            }}
+            window.XMLHttpRequest = XHR;
+          }} catch (_) {{}}
+
+          // Console proxy
+          (() => {{
+            const levels = ['log', 'info', 'warn', 'error'];
+            for (const level of levels) {{
+              const orig = console[level];
+              console[level] = function(...args) {{
+                try {{
+                  const msg = args.map(a => {{ try {{ return typeof a === 'string' ? a : JSON.stringify(a); }} catch {{ return String(a); }} }}).join(' ');
+                  recentLogs = limit([...recentLogs, {{ level, msg }}], 50);
+                  toMain('webview-telemetry', {{ kind: 'console', level, message: msg }});
+                }} catch (_) {{}}
+                return orig.apply(this, args);
+              }};
+            }}
+          }})();
+
+          // Errors
+          window.addEventListener('error', (e) => toMain('webview-telemetry', {{ kind: 'error', message: e && e.message || 'Error', source: e && e.filename || null, lineno: e && e.lineno || null, colno: e && e.colno || null }}), {{ capture: true }});
+          window.addEventListener('unhandledrejection', (e) => toMain('webview-telemetry', {{ kind: 'unhandledrejection', reason: String(e && e.reason) }}), {{ capture: true }});
+
+          // Periodic lightweight ping of basic info
+          setInterval(() => {{
+            try {{ toMain('webview-telemetry', {{ kind: 'heartbeat', title: document.title, url: location.href }}); }} catch (_) {{}}
+          }}, 5000);
+
+          // Init log for sanity
+          toMain('webview-telemetry', {{ kind: 'init' }});
+        }})();
+    "#, label = label);
 
     let label_clone = label.clone();
     let window_clone = window.clone();
