@@ -1,5 +1,5 @@
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
-use tauri_plugin_decorum::WebviewWindowExt;
+// WebviewWindowExt not used directly; plugin is initialized below
 
 #[cfg(target_os = "macos")]
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
@@ -61,6 +61,23 @@ async fn create_browser_webview(
                     "label": label_for_page_load.clone(),
                     "url": url.to_string()
                 }));
+            })
+            .on_document_title_changed({
+                let window_for_title = window.clone();
+                let label_for_title = label.clone();
+                move |_wv, title| {
+                    println!(
+                        "[Rust] Webview '{}' title changed: {}",
+                        label_for_title, title
+                    );
+                    let _ = window_for_title.emit(
+                        "webview-title-changed",
+                        serde_json::json!({
+                            "label": label_for_title.clone(),
+                            "title": title
+                        }),
+                    );
+                }
             }),
         logical_pos,
         logical_size,

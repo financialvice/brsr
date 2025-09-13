@@ -1,4 +1,88 @@
+import { useEffect, useState } from "react";
 import type { Tab } from "../types";
+
+const getPrimaryFavicon = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+    return new URL("/favicon.ico", `${u.protocol}//${u.host}`).toString();
+  } catch {
+    return null;
+  }
+};
+
+const getFallbackFavicon = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+    const host = u.hostname;
+    return `https://www.google.com/s2/favicons?sz=32&domain=${host}`;
+  } catch {
+    return null;
+  }
+};
+
+interface FaviconProps {
+  url: string;
+  title: string;
+}
+
+function Favicon({ url, title }: FaviconProps) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const primary = getPrimaryFavicon(url);
+    const fallback = getFallbackFavicon(url);
+
+    const candidates = [primary, fallback].filter((s): s is string =>
+      Boolean(s)
+    );
+
+    if (candidates.length === 0) {
+      setSrc(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const load = (u: string) =>
+      new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(u);
+        img.onerror = reject;
+        img.src = u;
+      });
+
+    Promise.any(candidates.map((c) => load(c)))
+      .then((winner) => {
+        if (!cancelled) {
+          setSrc(winner);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSrc(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  if (!src) {
+    return null;
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className="mr-2 inline-block h-4 w-4 rounded-sm bg-center bg-no-repeat"
+      style={{ backgroundImage: `url("${src}")`, backgroundSize: "contain" }}
+      title={`${title || "Tab"} favicon`}
+    />
+  );
+}
 
 interface TabStripProps {
   tabs: Tab[];
@@ -27,7 +111,15 @@ export function TabStrip({
             }min-w-[120px] max-w-[200px]`}
             key={tab.id}
             onClick={() => onTabClick(tab.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                onTabClick(tab.id);
+              }
+            }}
+            role="button"
+            tabIndex={0}
           >
+            <Favicon title={tab.title} url={tab.url} />
             <span className="flex-1 truncate text-sm">
               {tab.title || "New Tab"}
             </span>

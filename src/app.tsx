@@ -246,6 +246,31 @@ function App() {
     };
   }, []);
 
+  // Listen for webview title changes and update associated tab
+  useEffect(() => {
+    const unlistenTitle = listen<{ label: string; title: string }>(
+      "webview-title-changed",
+      (event) => {
+        const { label, title } = event.payload;
+        if (!title || title.trim() === "") {
+          return;
+        }
+        setState((prev) => ({
+          ...prev,
+          tabs: prev.tabs.map((tab) =>
+            tab.webviewLabel === label && tab.title !== title
+              ? { ...tab, title }
+              : tab
+          ),
+        }));
+      }
+    );
+
+    return () => {
+      unlistenTitle.then((fn) => fn());
+    };
+  }, []);
+
   // Removed URL polling; rely on webview-navigated events instead
 
   // Update navigation state based on history

@@ -1,7 +1,9 @@
 # Project Context
 
-## {{project_name}}
-{{project_description}}
+## brsr
+a super minimal web browser built with Tauri, Vite, React, and TypeScript
+- focuses on prototyping novel UI-UX for a browser
+- goal is to implement basics with a nice DX (tab management, navigation, interaction with webviews, etc.)
 
 ## Expected Workflow
 You should frequently lint and typecheck. You can liberally use `bun run lint:fix` because our linter is very strict. NEVER consider a task complete unless we are passing linting and typechecking. If you have made many attempts to fix a linting or typechecking error, you can stop and ask for help. Be very clear about the solutions you attempted.
