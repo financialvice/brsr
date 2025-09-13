@@ -556,30 +556,21 @@ fn set_default_browser(app: tauri::AppHandle, _bundle_id: Option<String>) -> Res
 fn get_default_http_handler() -> Result<String, String> {
     #[cfg(target_os = "macos")]
     unsafe {
-        use objc::{class, msg_send, sel, sel_impl};
-        use objc::runtime::Object;
-        use objc_foundation::{INSString, NSString};
-
-        let ws: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
-        let http: *mut Object = msg_send![class!(NSURL), URLWithString: NSString::from_str("http:")];
-        if http.is_null() { return Err("Could not create http URL".into()); }
-        let app_url: *mut Object = msg_send![ws, URLForApplicationToOpenURL: http];
-        if app_url.is_null() {
+        use core_foundation::base::TCFType;
+        use core_foundation::string::CFString;
+        use core_foundation_sys::string::CFStringRef;
+        // LaunchServices API reflects changes promptly; NSWorkspace may cache.
+        #[allow(non_snake_case)]
+        extern "C" {
+            fn LSCopyDefaultHandlerForURLScheme(inScheme: CFStringRef) -> CFStringRef;
+        }
+        let http = CFString::new("http");
+        let handler_ref = LSCopyDefaultHandlerForURLScheme(http.as_concrete_TypeRef());
+        if handler_ref.is_null() {
             return Ok("(none)".into());
         }
-        let bundle: *mut Object = msg_send![class!(NSBundle), bundleWithURL: app_url];
-        if bundle.is_null() {
-            return Ok("(unknown)".into());
-        }
-        let bid: *mut Object = msg_send![bundle, bundleIdentifier];
-        if bid.is_null() {
-            return Ok("(unknown)".into());
-        }
-        let bytes: *const std::os::raw::c_char = msg_send![bid, UTF8String];
-        if bytes.is_null() {
-            return Ok("(unknown)".into());
-        }
-        Ok(std::ffi::CStr::from_ptr(bytes).to_string_lossy().into_owned())
+        let handler = unsafe { CFString::wrap_under_create_rule(handler_ref) };
+        Ok(handler.to_string())
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -665,26 +656,26 @@ fn list_http_candidates() -> Result<Vec<String>, String> {
 fn is_default_browser() -> Result<bool, String> {
     #[cfg(target_os = "macos")]
     unsafe {
-        use objc::{class, msg_send, sel, sel_impl};
+        use core_foundation::base::TCFType;
+        use core_foundation::string::CFString;
+        use core_foundation_sys::string::CFStringRef;
+        use objc::{class, msg_send};
         use objc::runtime::Object;
-        use objc_foundation::INSString;
 
-        // Current default for http:
-        let ws: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
-        let http: *mut Object = msg_send![class!(NSURL), URLWithString: objc_foundation::NSString::from_str("http:")];
-        if http.is_null() { return Err("Could not create http URL".into()); }
-        let app_url: *mut Object = msg_send![ws, URLForApplicationToOpenURL: http];
-        if app_url.is_null() { return Ok(false); }
+        #[allow(non_snake_case)]
+        extern "C" {
+            fn LSCopyDefaultHandlerForURLScheme(inScheme: CFStringRef) -> CFStringRef;
+        }
 
-        let default_bundle: *mut Object = msg_send![class!(NSBundle), bundleWithURL: app_url];
-        if default_bundle.is_null() { return Ok(false); }
-        let default_bid_ns: *mut Object = msg_send![default_bundle, bundleIdentifier];
-        if default_bid_ns.is_null() { return Ok(false); }
-        let default_bid_bytes: *const std::os::raw::c_char = msg_send![default_bid_ns, UTF8String];
-        if default_bid_bytes.is_null() { return Ok(false); }
-        let default_bid = std::ffi::CStr::from_ptr(default_bid_bytes).to_string_lossy().into_owned();
+        // Current default via LaunchServices
+        let http = CFString::new("http");
+        let handler_ref = LSCopyDefaultHandlerForURLScheme(http.as_concrete_TypeRef());
+        if handler_ref.is_null() {
+            return Ok(false);
+        }
+        let handler = CFString::wrap_under_create_rule(handler_ref).to_string();
 
-        // Our bundle id:
+        // Our bundle id
         let main_bundle: *mut Object = msg_send![class!(NSBundle), mainBundle];
         let our_bid_ns: *mut Object = msg_send![main_bundle, bundleIdentifier];
         if our_bid_ns.is_null() { return Ok(false); }
@@ -692,7 +683,7 @@ fn is_default_browser() -> Result<bool, String> {
         if our_bid_bytes.is_null() { return Ok(false); }
         let our_bid = std::ffi::CStr::from_ptr(our_bid_bytes).to_string_lossy().into_owned();
 
-        Ok(default_bid == our_bid)
+        Ok(handler == our_bid)
     }
     #[cfg(not(target_os = "macos"))]
     {
