@@ -9,6 +9,14 @@ edition = "2021"
 name = "brsr_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
+[features]
+default = []
+# Enable extra devtools helpers in debug or via `--features devtools`.
+devtools = []
+# Silence macro-expansion `cfg(feature = "cargo-clippy")` warnings coming from
+# 3rd-party macros expanded in this crate (harmless but noisy during release builds).
+"cargo-clippy" = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
