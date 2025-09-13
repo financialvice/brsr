@@ -569,7 +569,7 @@ fn get_default_http_handler() -> Result<String, String> {
         if handler_ref.is_null() {
             return Ok("(none)".into());
         }
-        let handler = unsafe { CFString::wrap_under_create_rule(handler_ref) };
+        let handler = { CFString::wrap_under_create_rule(handler_ref) };
         Ok(handler.to_string())
     }
     #[cfg(not(target_os = "macos"))]
