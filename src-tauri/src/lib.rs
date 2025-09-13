@@ -659,7 +659,7 @@ fn is_default_browser() -> Result<bool, String> {
         use core_foundation::base::TCFType;
         use core_foundation::string::CFString;
         use core_foundation_sys::string::CFStringRef;
-        use objc::{class, msg_send};
+        use objc::{class, msg_send, sel, sel_impl};
         use objc::runtime::Object;
 
         #[allow(non_snake_case)]

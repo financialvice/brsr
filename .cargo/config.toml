@@ -1,0 +1,10 @@
+[env]
+CC = "clang"
+CXX = "clang++"
+
+[target.aarch64-apple-darwin]
+linker = "clang"
+
+[target.x86_64-apple-darwin]
+linker = "clang"
+
