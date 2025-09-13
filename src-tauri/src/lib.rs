@@ -232,22 +232,14 @@ pub fn run() {
             let main_window = app.get_webview_window("main").unwrap();
             println!("[Rust] Main window created, label: {}", main_window.label());
             
-            // Create custom overlay titlebar for decorum
-            main_window.create_overlay_titlebar()
-                .expect("Failed to create overlay titlebar");
-            
             // Apply vibrancy effect based on platform
             #[cfg(target_os = "macos")]
             {
-                // Set custom inset for traffic lights (x, y offset)
-                main_window.set_traffic_lights_inset(12.0, 16.0)
-                    .expect("Failed to set traffic lights inset");
-                
                 // Use HudWindow for a dark, glassy effect
                 // Other options: Sidebar, UnderWindowBackground, UnderPageBackground, etc.
                 apply_vibrancy(&main_window, NSVisualEffectMaterial::HudWindow, None, None)
                     .expect("Failed to apply window vibrancy on macOS");
-                println!("[Rust] Applied vibrancy effect and traffic lights inset on macOS");
+                println!("[Rust] Applied vibrancy effect on macOS");
             }
             
             #[cfg(target_os = "windows")]
