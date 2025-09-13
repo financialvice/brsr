@@ -125,4 +125,16 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  html,
+  body {
+    height: 100vh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  #root {
+    height: 100vh;
+    overflow: hidden;
+  }
 }
