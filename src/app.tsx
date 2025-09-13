@@ -246,32 +246,7 @@ function App() {
     };
   }, []);
 
-  // Poll webview URLs periodically to catch navigation
-  useEffect(() => {
-    if (!activeTab) {
-      return;
-    }
-
-    const pollUrl = async () => {
-      try {
-        // Poll the webview to check for URL changes
-        await invoke("poll_webview_url", { label: activeTab.webviewLabel });
-      } catch {
-        // Ignore errors - webview might not be ready yet
-      }
-    };
-
-    // Wait a bit for webview to be created, then poll every 500ms
-    const timeout = setTimeout(() => {
-      pollUrl();
-      const interval = setInterval(pollUrl, 500);
-
-      // Store interval in a ref or state to clear it later
-      return () => clearInterval(interval);
-    }, 1000);
-
-    return () => clearTimeout(timeout);
-  }, [activeTab]);
+  // Removed URL polling; rely on webview-navigated events instead
 
   // Update navigation state based on history
   useEffect(() => {

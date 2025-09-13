@@ -149,6 +149,7 @@ We use Ultracite, a preset for Biome's lightning fast formatter and linter, whic
 - Make sure JSDoc comment lines start with a single asterisk, except for the first one.
 - Don't use spread (`...`) syntax on accumulators.
 - Don't use namespace imports.
+- Don't use void.
 - Declare regex literals at the top level.
 
 #### TypeScript Best Practices

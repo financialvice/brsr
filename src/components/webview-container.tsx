@@ -12,9 +12,11 @@ export function WebviewContainer({ tabs, activeTabId }: WebviewContainerProps) {
   const createdWebviewsRef = useRef<Set<string>>(new Set());
   const urlRef = useRef<Map<string, string>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
+  const labelByTabIdRef = useRef<Map<string, string>>(new Map());
+  const visibleTabIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: FIX SOON
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: tracked in issue to refactor; kept for minimal changes
     const createOrUpdateWebviews = async () => {
       const rect = containerRef.current?.getBoundingClientRect();
 
@@ -47,49 +49,31 @@ export function WebviewContainer({ tabs, activeTabId }: WebviewContainerProps) {
 
         if (!createdWebviewsRef.current.has(tab.id)) {
           try {
-            // Get the device pixel ratio for proper scaling
-            const dpr = window.devicePixelRatio || 1;
-
-            // The positions need to be in physical pixels for the Rust side
-            // which will convert them back to logical pixels
-            // Add a small offset to ensure we don't cover the tab bar
-            const TAB_BAR_OFFSET = 50; // Additional pixels to push down
-            const physicalX = Math.round(rect.left * dpr);
-            const physicalY = Math.round((rect.top + TAB_BAR_OFFSET) * dpr);
-            const physicalWidth = Math.round(rect.width * dpr);
-            const physicalHeight = Math.round(
-              (rect.height - TAB_BAR_OFFSET) * dpr
-            );
+            // Use logical CSS pixels directly (Tauri expects logical units)
+            const logicalX = Math.round(rect.left);
+            const logicalY = Math.round(rect.top);
+            const logicalWidth = Math.round(rect.width);
+            const logicalHeight = Math.round(rect.height);
 
             console.log(
               `[WebviewContainer] Creating webview ${tab.webviewLabel} with dimensions:`,
               {
-                logical: {
-                  x: rect.left,
-                  y: rect.top,
-                  width: rect.width,
-                  height: rect.height,
-                },
-                physical: {
-                  x: physicalX,
-                  y: physicalY,
-                  width: physicalWidth,
-                  height: physicalHeight,
-                },
-                dpr,
+                x: logicalX,
+                y: logicalY,
+                width: logicalWidth,
+                height: logicalHeight,
                 url: tab.url,
               }
             );
 
-            // Use the Rust command to create the webview
-            // Pass physical pixel values since Rust will convert to logical
+            // Create the webview with logical coordinates
             await invoke("create_browser_webview", {
               label: tab.webviewLabel,
               url: tab.url,
-              x: physicalX,
-              y: physicalY,
-              width: physicalWidth,
-              height: physicalHeight,
+              x: logicalX,
+              y: logicalY,
+              width: logicalWidth,
+              height: logicalHeight,
             });
 
             console.log(
@@ -97,15 +81,18 @@ export function WebviewContainer({ tabs, activeTabId }: WebviewContainerProps) {
             );
             createdWebviewsRef.current.add(tab.id);
             urlRef.current.set(tab.id, tab.url);
+            labelByTabIdRef.current.set(tab.id, tab.webviewLabel);
 
-            // Handle visibility
+            // Handle visibility deterministically: only active tab is visible
             if (tab.id === activeTabId) {
               await invoke("show_webview", { label: tab.webviewLabel });
+              visibleTabIdsRef.current.add(tab.id);
               console.log(
                 `[WebviewContainer] Showed webview ${tab.webviewLabel}`
               );
             } else {
               await invoke("hide_webview", { label: tab.webviewLabel });
+              visibleTabIdsRef.current.delete(tab.id);
               console.log(`[WebviewContainer] Hid webview ${tab.webviewLabel}`);
             }
           } catch (error) {
@@ -117,24 +104,25 @@ export function WebviewContainer({ tabs, activeTabId }: WebviewContainerProps) {
         }
       }
 
-      // Clean up stray webviews + enforce visibility in case of tab changes
+      // Clean up stray webviews + enforce visibility when active tab changes
       for (const tabId of createdWebviewsRef.current) {
         const tab = tabs.find((t) => t.id === tabId);
         if (!tab) {
-          const oldTab = Array.from(urlRef.current.entries()).find(
-            ([id]) => id === tabId
-          );
-          if (oldTab) {
-            await invoke("close_webview", {
-              label: `webview-${tabId.replace("tab-", "")}`,
-            }).catch(console.error);
+          const label = labelByTabIdRef.current.get(tabId);
+          if (label) {
+            await invoke("close_webview", { label }).catch(console.error);
           }
           createdWebviewsRef.current.delete(tabId);
           urlRef.current.delete(tabId);
+          labelByTabIdRef.current.delete(tabId);
         } else if (tabId === activeTabId) {
-          await invoke("show_webview", { label: tab.webviewLabel });
-        } else {
+          if (!visibleTabIdsRef.current.has(tabId)) {
+            await invoke("show_webview", { label: tab.webviewLabel });
+            visibleTabIdsRef.current.add(tabId);
+          }
+        } else if (visibleTabIdsRef.current.has(tabId)) {
           await invoke("hide_webview", { label: tab.webviewLabel });
+          visibleTabIdsRef.current.delete(tabId);
         }
       }
     };
@@ -144,62 +132,68 @@ export function WebviewContainer({ tabs, activeTabId }: WebviewContainerProps) {
 
   // Handle resizing of webviews when the container changes
   useEffect(() => {
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: FIX SOON
-    const updateWebviewBounds = async () => {
+    let raf = 0;
+
+    const updateActiveBounds = async () => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect || rect.width < 2 || rect.height < 2) {
         return;
       }
 
-      const dpr = window.devicePixelRatio || 1;
-      const TAB_BAR_OFFSET = 50; // Same offset as in creation
-      const physicalX = Math.round(rect.left * dpr);
-      const physicalY = Math.round((rect.top + TAB_BAR_OFFSET) * dpr);
-      const physicalWidth = Math.round(rect.width * dpr);
-      const physicalHeight = Math.round((rect.height - TAB_BAR_OFFSET) * dpr);
+      const logicalX = Math.round(rect.left);
+      const logicalY = Math.round(rect.top);
+      const logicalWidth = Math.round(rect.width);
+      const logicalHeight = Math.round(rect.height);
 
-      // Update bounds for all created webviews
-      for (const tab of tabs) {
-        if (createdWebviewsRef.current.has(tab.id)) {
-          try {
-            await invoke("update_webview_bounds", {
-              label: tab.webviewLabel,
-              x: physicalX,
-              y: physicalY,
-              width: physicalWidth,
-              height: physicalHeight,
-            });
-          } catch (e) {
-            console.error(
-              `[WebviewContainer] Failed to update bounds for ${tab.webviewLabel}:`,
-              e
-            );
-          }
-        }
+      const active = tabs.find((t) => t.id === activeTabId);
+      if (!active) {
+        return;
+      }
+      if (!createdWebviewsRef.current.has(active.id)) {
+        return;
+      }
+
+      try {
+        await invoke("update_webview_bounds", {
+          label: active.webviewLabel,
+          x: logicalX,
+          y: logicalY,
+          width: logicalWidth,
+          height: logicalHeight,
+        });
+      } catch (e) {
+        console.error(
+          `[WebviewContainer] Failed to update bounds for ${active.webviewLabel}:`,
+          e
+        );
       }
     };
 
-    // Update on window resize
-    const handleResize = () => {
-      updateWebviewBounds();
+    const schedule = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        // Intentionally not awaited; rAF callback
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        updateActiveBounds();
+      });
     };
 
-    window.addEventListener("resize", handleResize);
-
-    // Also update when container size changes
-    const resizeObserver = new ResizeObserver(() => {
-      updateWebviewBounds();
-    });
-
+    const resizeObserver = new ResizeObserver(() => schedule());
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
     }
+    const onWindow = () => schedule();
+    window.addEventListener("resize", onWindow);
+
+    // Run once on mount / dependency change
+    schedule();
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onWindow);
       resizeObserver.disconnect();
     };
-  }, [tabs]);
+  }, [tabs, activeTabId]);
 
   return (
     <div className="relative flex-1 bg-transparent" ref={containerRef}>

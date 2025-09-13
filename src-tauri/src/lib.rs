@@ -23,14 +23,9 @@ async fn create_browser_webview(
     let url_parsed = url.parse::<url::Url>()
         .map_err(|e| format!("Failed to parse URL: {}", e))?;
     
-    // Convert physical coordinates (from the frontend) to logical, per Tauri expectations
-    let scale = window
-        .scale_factor()
-        .map_err(|e| format!("Failed to get scale factor: {}", e))?
-        as f64;
-
-    let logical_pos = LogicalPosition::new(x / scale, y / scale);
-    let logical_size = LogicalSize::new(width / scale, height / scale);
+    // Coordinates are already provided in logical (CSS) pixels from the frontend
+    let logical_pos = LogicalPosition::new(x, y);
+    let logical_size = LogicalSize::new(width, height);
 
     // Simple script to emit navigation events when the page loads
     let navigation_script = format!(r#"
@@ -44,7 +39,6 @@ async fn create_browser_webview(
     
     let result = window.add_child(
         WebviewBuilder::new(label.clone(), WebviewUrl::External(url_parsed))
-            .auto_resize()
             .initialization_script(&navigation_script)
             .on_navigation(move |url| {
                 println!("[Rust] Webview '{}' navigating to: {}", label_clone, url);
@@ -128,14 +122,9 @@ async fn update_webview_bounds(
     println!("[Rust] Updating webview '{}' position to ({}, {}) with size {}x{}", label, x, y, width, height);
     
     if let Some(webview) = window.get_webview(&label) {
-        let scale = window
-            .scale_factor()
-            .map_err(|e| format!("Failed to get scale factor: {}", e))?
-            as f64;
+        let logical_pos = LogicalPosition::new(x, y);
+        let logical_size = LogicalSize::new(width, height);
 
-        let logical_pos = LogicalPosition::new(x / scale, y / scale);
-        let logical_size = LogicalSize::new(width / scale, height / scale);
-        
         webview.set_position(logical_pos).map_err(|e| e.to_string())?;
         webview.set_size(logical_size).map_err(|e| e.to_string())?;
         
@@ -202,41 +191,7 @@ async fn navigate_forward_webview(window: tauri::Window, label: String) -> Resul
 
 
 
-#[tauri::command]
-async fn poll_webview_url(window: tauri::Window, label: String) -> Result<String, String> {
-    if let Some(webview) = window.get_webview(&label) {
-        // Inject a script that will check the URL and emit it if changed
-        let emit_script = format!(r#"
-            (function() {{
-                const currentUrl = window.location.href;
-                const lastUrlKey = '__lastPolledUrl_{}';
-                const lastUrl = window[lastUrlKey];
-                
-                if (!lastUrl || lastUrl !== currentUrl) {{
-                    window[lastUrlKey] = currentUrl;
-                    console.log('[Webview {}] URL changed to:', currentUrl);
-                    
-                    // We can't directly communicate back to Rust from eval,
-                    // but we logged it for debugging
-                    
-                    // Return the URL (though we can't capture it in Rust)
-                    return currentUrl;
-                }}
-                
-                return null;
-            }})();
-        "#, label, label);
-        
-        // Execute the script
-        webview.eval(&emit_script).map_err(|e| e.to_string())?;
-        
-        // We'll need to use the on_navigation callback for actual tracking
-        Ok(String::from("Polling completed"))
-    } else {
-        // Return error but don't log - this is expected before webview is created
-        return Err(format!("Webview '{}' not found", label));
-    }
-}
+// (removed) poll_webview_url: replaced by event-driven navigation reporting
 
 #[tauri::command]
 async fn check_navigation_state(window: tauri::Window, label: String) -> Result<(bool, bool), String> {
@@ -271,8 +226,7 @@ pub fn run() {
             refresh_webview,
             navigate_back_webview,
             navigate_forward_webview,
-            check_navigation_state,
-            poll_webview_url
+            check_navigation_state
         ])
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
