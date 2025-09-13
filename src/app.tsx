@@ -6,6 +6,7 @@ import { AssistantPanel } from "./components/assistant-panel";
 import { TabStrip } from "./components/tab-strip";
 import { TopBar } from "./components/top-bar";
 import { WebviewContainer } from "./components/webview-container";
+import { useIsDefaultBrowser } from "./hooks/use-is-default-browser";
 import type { BrowserState, Tab } from "./types";
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
     canGoBack: false,
     canGoForward: false,
   });
+  const { isDefaultBrowser, refresh } = useIsDefaultBrowser();
 
   // Using JS-side webview plugin now; no manual registry required
 
@@ -192,6 +194,8 @@ function App() {
 
   const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
 
+  // Default browser status handled by useIsDefaultBrowser hook
+
   // Listen for webview navigation events
   useEffect(() => {
     const unlisten = listen<{ label: string; url: string }>(
@@ -354,20 +358,28 @@ function App() {
         currentUrl={activeTab?.url || ""}
         onBack={handleBack}
         onForward={handleForward}
-        onMakeDefaultBrowser={async () => {
-          console.log("[Frontend] Make Default: clicked");
-          try {
-            console.log(
-              "[Frontend] Make Default: invoking set_default_browser..."
-            );
-            await invoke("set_default_browser", {
-              bundleId: "com.brsr.browser",
-            });
-            console.log("[Frontend] Make Default: invoke completed");
-          } catch (error) {
-            console.error("[Frontend] Failed to set default browser:", error);
-          }
-        }}
+        onMakeDefaultBrowser={
+          isDefaultBrowser
+            ? undefined
+            : async () => {
+                console.log("[Frontend] Make Default: clicked");
+                try {
+                  console.log(
+                    "[Frontend] Make Default: invoking set_default_browser..."
+                  );
+                  await invoke("set_default_browser", {
+                    bundleId: "com.brsr.browser",
+                  });
+                  console.log("[Frontend] Make Default: invoke completed");
+                  await refresh();
+                } catch (error) {
+                  console.error(
+                    "[Frontend] Failed to set default browser:",
+                    error
+                  );
+                }
+              }
+        }
         onNavigate={navigateActiveTab}
         onReload={handleReload}
       />
