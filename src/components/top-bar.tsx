@@ -49,7 +49,7 @@ export function TopBar({
 
   return (
     <div
-      className={`relative flex h-12 items-center space-x-2 border-b px-3 ${leftPadding}`}
+      className={`relative flex h-12 shrink-0 items-center space-x-2 border-b px-3 ${leftPadding}`}
     >
       {/* Left drag spacer (empty background only) */}
       <div aria-hidden className="drag h-8 w-2" data-tauri-drag-region />
