@@ -6,7 +6,10 @@ import { AssistantPanel } from "./components/assistant-panel";
 import { TabStrip } from "./components/tab-strip";
 import { TopBar } from "./components/top-bar";
 import { WebviewContainer } from "./components/webview-container";
-import { useIsDefaultBrowser } from "./hooks/use-is-default-browser";
+import {
+  useIsDefaultBrowser,
+  waitForDefaultChange,
+} from "./hooks/use-is-default-browser";
 import type { BrowserState, Tab } from "./types";
 
 function App() {
@@ -371,7 +374,15 @@ function App() {
                     bundleId: "com.brsr.browser",
                   });
                   console.log("[Frontend] Make Default: invoke completed");
-                  await refresh();
+                  // Begin short-lived watch so the button hides as soon as the user confirms
+                  waitForDefaultChange({ intervalMs: 1000, maxWaitMs: 180_000 })
+                    .then(() => refresh())
+                    .catch((err) =>
+                      console.error(
+                        "[Frontend] waitForDefaultChange error:",
+                        err
+                      )
+                    );
                 } catch (error) {
                   console.error(
                     "[Frontend] Failed to set default browser:",

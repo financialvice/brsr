@@ -44,3 +44,24 @@ export function useIsDefaultBrowser(options?: { pollMs?: number }) {
 
   return { isDefaultBrowser, refresh } as const;
 }
+
+export async function waitForDefaultChange(options?: {
+  intervalMs?: number;
+  maxWaitMs?: number;
+}) {
+  const intervalMs = options?.intervalMs ?? 1000;
+  const maxWaitMs = options?.maxWaitMs ?? 120_000; // 2 minutes
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const initial = await invoke<boolean>("is_default_browser");
+  const start = Date.now();
+  // Poll until the default status flips or timeout
+  while (Date.now() - start < maxWaitMs) {
+    const cur = await invoke<boolean>("is_default_browser");
+    if (cur !== initial) {
+      return cur;
+    }
+    await sleep(intervalMs);
+  }
+  return initial;
+}
