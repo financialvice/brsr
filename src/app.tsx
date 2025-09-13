@@ -364,14 +364,8 @@ function App() {
               bundleId: "com.brsr.browser",
             });
             console.log("[Frontend] Make Default: invoke completed");
-            // eslint-disable-next-line no-alert
-            alert(
-              "Requested default change. If no dialog appeared, check System Settings or another Space — the system consent window can open behind other apps."
-            );
           } catch (error) {
             console.error("[Frontend] Failed to set default browser:", error);
-            // eslint-disable-next-line no-alert
-            alert(`Could not set default browser: ${error}`);
           }
         }}
         onNavigate={navigateActiveTab}
