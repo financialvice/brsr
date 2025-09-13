@@ -397,12 +397,277 @@ async fn check_navigation_state(window: tauri::Window, label: String) -> Result<
     }
 }
 
+#[tauri::command]
+fn set_default_browser(app: tauri::AppHandle, _bundle_id: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use objc::{class, msg_send, sel, sel_impl};
+        use objc::runtime::{Object, Sel, BOOL, YES};
+        use objc_foundation::{INSString, NSString};
+        use std::ptr;
+
+        // Run on the main thread – UI work in AppKit must.
+        app.run_on_main_thread(move || unsafe {
+            println!("[set_default_browser] Starting on main thread");
+
+            // Get our .app bundle URL
+            let nsbundle: *mut Object = msg_send![class!(NSBundle), mainBundle];
+            let app_url: *mut Object = msg_send![nsbundle, bundleURL];
+            if app_url.is_null() {
+                // we can't emit errors from inside the closure, so log to stderr
+                eprintln!("[set_default_browser] ERROR: could not obtain bundleURL");
+                return;
+            }
+
+            // Get the bundle identifier for debugging
+            let bundle_id_ns: *mut Object = msg_send![nsbundle, bundleIdentifier];
+            if !bundle_id_ns.is_null() {
+                let bundle_id_bytes: *const std::os::raw::c_char = msg_send![bundle_id_ns, UTF8String];
+                let bundle_id_str = std::ffi::CStr::from_ptr(bundle_id_bytes).to_string_lossy();
+                println!("[set_default_browser] Bundle ID: {}", bundle_id_str);
+            } else {
+                println!("[set_default_browser] WARNING: No bundle identifier found");
+            }
+
+            // Get the app URL string for debugging
+            let url_str: *mut Object = msg_send![app_url, absoluteString];
+            if !url_str.is_null() {
+                let url_bytes: *const std::os::raw::c_char = msg_send![url_str, UTF8String];
+                let url_string = std::ffi::CStr::from_ptr(url_bytes).to_string_lossy();
+                println!("[set_default_browser] App URL: {}", url_string);
+            }
+
+            let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+            println!("[set_default_browser] Got NSWorkspace instance");
+
+            // Use modern API (macOS 12+) to set default app for both http and https.
+            // Also attempt to associate HTML content type like Chromium does.
+            let sel_set: Sel = sel!(setDefaultApplicationAtURL:toOpenURLsWithScheme:completionHandler:);
+
+            // Guard for macOS 12+: only call if the selector exists
+            let responds: BOOL = msg_send![workspace, respondsToSelector: sel_set];
+            println!("[set_default_browser] Checking if selector exists: {}", if responds == YES { "YES" } else { "NO" });
+            if responds != YES {
+                // Fallback for very old macOS (<=11): old LaunchServices path (deprecated).
+                // You can remove this block if you only support 12+.
+                #[allow(non_snake_case)]
+                extern "C" {
+                    fn LSSetDefaultHandlerForURLScheme(
+                        inScheme: *mut std::ffi::c_void,
+                        inHandlerBundleIdentifier: *mut std::ffi::c_void,
+                    ) -> i32;
+                }
+                use core_foundation::base::TCFType;
+                use core_foundation::string::CFString;
+
+                // Set both http and https on legacy systems as well.
+                let scheme_http = CFString::new("http");
+                let scheme_https = CFString::new("https");
+                // Use our real bundle id if you want the fallback – reading it here keeps it correct.
+                let bundle_id_cf = {
+                    let id_ns: *mut Object = msg_send![nsbundle, bundleIdentifier];
+                    let bytes: *const std::os::raw::c_char = msg_send![id_ns, UTF8String];
+                    let s = std::ffi::CStr::from_ptr(bytes).to_string_lossy().into_owned();
+                    CFString::new(&s)
+                };
+                let s1 = LSSetDefaultHandlerForURLScheme(
+                    scheme_http.as_concrete_TypeRef() as *mut _,
+                    bundle_id_cf.as_concrete_TypeRef() as *mut _,
+                );
+                let s2 = LSSetDefaultHandlerForURLScheme(
+                    scheme_https.as_concrete_TypeRef() as *mut _,
+                    bundle_id_cf.as_concrete_TypeRef() as *mut _,
+                );
+                eprintln!("[set_default_browser] Using LSSetDefaultHandlerForURLScheme fallback, http={}, https={}", s1, s2);
+                return;
+            }
+
+            println!("[set_default_browser] Calling NSWorkspace setDefaultApplicationAtURL for http/https...");
+
+            // Call the AppKit API that shows the system consent dialog.
+            // Pass nil (null pointer) for completion handler – dialog still appears when needed.
+            let nil: *mut Object = ptr::null_mut();
+
+            // Request BOTH schemes explicitly.
+            let http = NSString::from_str("http");
+            let https = NSString::from_str("https");
+
+            let _: () = msg_send![
+              workspace,
+              setDefaultApplicationAtURL: app_url
+              toOpenURLsWithScheme: http
+              completionHandler: nil
+            ];
+            let _: () = msg_send![
+              workspace,
+              setDefaultApplicationAtURL: app_url
+              toOpenURLsWithScheme: https
+              completionHandler: nil
+            ];
+
+            // Also associate for HTML content type when API is available (macOS 12+ UTType).
+            let sel_set_ut: Sel = sel!(setDefaultApplicationAtURL:toOpenContentType:completionHandler:);
+            let responds_ut: BOOL = msg_send![workspace, respondsToSelector: sel_set_ut];
+            if responds_ut == YES {
+                let ut_html: *mut Object = msg_send![class!(UTType), typeWithIdentifier: NSString::from_str("public.html")];
+                if !ut_html.is_null() {
+                    let _: () = msg_send![
+                        workspace,
+                        setDefaultApplicationAtURL: app_url
+                        toOpenContentType: ut_html
+                        completionHandler: nil
+                    ];
+                }
+            }
+
+            // Bring CoreServicesUIAgent to the foreground so the consent dialog is visible.
+            // This mirrors Chromium's workaround for dialog ordering issues across Spaces.
+            let running: *mut Object = msg_send![workspace, runningApplications];
+            let count: usize = msg_send![running, count];
+            for i in 0..count {
+                let app_obj: *mut Object = msg_send![running, objectAtIndex: i];
+                let bid: *mut Object = msg_send![app_obj, bundleIdentifier];
+                if !bid.is_null() {
+                    let bytes: *const std::os::raw::c_char = msg_send![bid, UTF8String];
+                    if !bytes.is_null() {
+                        let s = std::ffi::CStr::from_ptr(bytes).to_string_lossy();
+                        if s == "com.apple.coreservices.uiagent" {
+                            // 3 == NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps
+                            let _: BOOL = msg_send![app_obj, activateWithOptions: 3usize];
+                            println!("[set_default_browser] Activated CoreServicesUIAgent for consent dialog");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            println!("[set_default_browser] NSWorkspace calls completed");
+        }).map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Default browser setting is only supported on macOS".to_string())
+    }
+}
+
+#[tauri::command]
+fn get_default_http_handler() -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        use objc::{class, msg_send, sel, sel_impl};
+        use objc::runtime::Object;
+        use objc_foundation::{INSString, NSString};
+
+        let ws: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let http: *mut Object = msg_send![class!(NSURL), URLWithString: NSString::from_str("http:")];
+        if http.is_null() { return Err("Could not create http URL".into()); }
+        let app_url: *mut Object = msg_send![ws, URLForApplicationToOpenURL: http];
+        if app_url.is_null() {
+            return Ok("(none)".into());
+        }
+        let bundle: *mut Object = msg_send![class!(NSBundle), bundleWithURL: app_url];
+        if bundle.is_null() {
+            return Ok("(unknown)".into());
+        }
+        let bid: *mut Object = msg_send![bundle, bundleIdentifier];
+        if bid.is_null() {
+            return Ok("(unknown)".into());
+        }
+        let bytes: *const std::os::raw::c_char = msg_send![bid, UTF8String];
+        if bytes.is_null() {
+            return Ok("(unknown)".into());
+        }
+        Ok(std::ffi::CStr::from_ptr(bytes).to_string_lossy().into_owned())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("macOS only".into())
+    }
+}
+
+// Devtools command: available in debug builds or when the `devtools` feature is enabled.
+#[cfg(any(debug_assertions, feature = "devtools"))]
+#[tauri::command]
+fn open_main_devtools(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("main") {
+        w.open_devtools();
+    }
+    Ok(())
+}
+
+#[cfg(not(any(debug_assertions, feature = "devtools")))]
+#[tauri::command]
+fn open_main_devtools(_app: tauri::AppHandle) -> Result<(), String> {
+    Err("Devtools are disabled in this build".to_string())
+}
+
+#[tauri::command]
+fn list_http_candidates() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        use objc::{class, msg_send, sel, sel_impl};
+        use objc::runtime::Object;
+        use objc_foundation::{INSString, NSString};
+
+        let ws: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let http: *mut Object = msg_send![class!(NSURL), URLWithString: NSString::from_str("http:")];
+        if http.is_null() { return Err("Could not create http URL".into()); }
+        let urls: *mut Object = msg_send![ws, URLsForApplicationsToOpenURL: http];
+        if urls.is_null() {
+            return Ok(Vec::new());
+        }
+        let fm: *mut Object = msg_send![class!(NSFileManager), defaultManager];
+        let mut out: Vec<String> = Vec::new();
+        let count: usize = msg_send![urls, count];
+        for i in 0..count {
+            let u: *mut Object = msg_send![urls, objectAtIndex: i];
+            if u.is_null() { continue; }
+            let bundle: *mut Object = msg_send![class!(NSBundle), bundleWithURL: u];
+            if bundle.is_null() { continue; }
+            let bid: *mut Object = msg_send![bundle, bundleIdentifier];
+            let path: *mut Object = msg_send![u, path];
+            let name: *mut Object = msg_send![fm, displayNameAtPath: path];
+            let mut entry = String::new();
+            if !name.is_null() {
+                let name_bytes: *const std::os::raw::c_char = msg_send![name, UTF8String];
+                if !name_bytes.is_null() {
+                    entry.push_str(&std::ffi::CStr::from_ptr(name_bytes).to_string_lossy());
+                }
+            }
+            if !bid.is_null() {
+                let bid_bytes: *const std::os::raw::c_char = msg_send![bid, UTF8String];
+                if !bid_bytes.is_null() {
+                    let id_str = std::ffi::CStr::from_ptr(bid_bytes).to_string_lossy();
+                    if !entry.is_empty() {
+                        entry.push_str(" (");
+                        entry.push_str(&id_str);
+                        entry.push(')');
+                    } else {
+                        entry.push_str(&id_str);
+                    }
+                }
+            }
+            if !entry.is_empty() {
+                out.push(entry);
+            }
+        }
+        Ok(out)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("macOS only".into())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_decorum::init())
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             create_browser_webview,
             show_webview,
@@ -413,11 +678,20 @@ pub fn run() {
             refresh_webview,
             navigate_back_webview,
             navigate_forward_webview,
-            check_navigation_state
+            check_navigation_state,
+            set_default_browser,
+            get_default_http_handler,
+            list_http_candidates,
+            open_main_devtools
         ])
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
             println!("[Rust] Main window created, label: {}", main_window.label());
+            // Auto-open devtools on debug builds to aid diagnostics
+            #[cfg(debug_assertions)]
+            {
+                main_window.open_devtools();
+            }
             
             // Apply vibrancy effect based on platform
             #[cfg(target_os = "macos")]

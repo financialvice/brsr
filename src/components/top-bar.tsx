@@ -13,6 +13,7 @@ interface TopBarProps {
   onReload: () => void;
   canGoBack?: boolean;
   canGoForward?: boolean;
+  onMakeDefaultBrowser?: () => void | Promise<void>;
 }
 
 export function TopBar({
@@ -23,6 +24,7 @@ export function TopBar({
   onReload,
   canGoBack = false,
   canGoForward = false,
+  onMakeDefaultBrowser,
 }: TopBarProps) {
   const [urlInput, setUrlInput] = useState(currentUrl);
   const isMac = useIsMac();
@@ -47,11 +49,10 @@ export function TopBar({
 
   return (
     <div
-      className={`drag relative flex h-12 items-center space-x-2 border-b px-3 ${leftPadding}`}
-      data-tauri-drag-region
+      className={`relative flex h-12 items-center space-x-2 border-b px-3 ${leftPadding}`}
     >
       {/* Left drag spacer (empty background only) */}
-      <div aria-hidden className="h-8 w-2" data-tauri-drag-region />
+      <div aria-hidden className="drag h-8 w-2" data-tauri-drag-region />
       <Button
         className="no-drag"
         disabled={!canGoBack}
@@ -95,8 +96,28 @@ export function TopBar({
         />
       </form>
 
+      {onMakeDefaultBrowser && (
+        <Button
+          className="no-drag"
+          onClick={async () => {
+            // Extra logging helps when drag regions swallow clicks on macOS overlays
+            console.log("[UI] Make Default clicked");
+            try {
+              await onMakeDefaultBrowser();
+            } catch (err) {
+              console.error("[UI] Make Default handler error:", err);
+            }
+          }}
+          title="Set brsr as default browser"
+          type="button"
+          variant="outline"
+        >
+          Make Default
+        </Button>
+      )}
+
       {/* Right drag spacer for grabbing the window when not interacting */}
-      <div aria-hidden className="h-8 w-20" data-tauri-drag-region />
+      <div aria-hidden className="drag h-8 w-20" data-tauri-drag-region />
     </div>
   );
 }

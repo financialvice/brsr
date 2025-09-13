@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useState } from "react";
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AssistantPanel } from "./components/assistant-panel";
 import { TabStrip } from "./components/tab-strip";
 import { TopBar } from "./components/top-bar";
@@ -19,15 +20,17 @@ function App() {
 
   // Using JS-side webview plugin now; no manual registry required
 
-  const createNewTab = useCallback(() => {
+  const createNewTab = useCallback((initialUrl?: string) => {
     const timestamp = Date.now();
+    const startUrl = initialUrl ?? "https://www.google.com";
+
     const newTab: Tab = {
       id: `tab-${timestamp}`,
       title: "New Tab",
-      url: "https://www.google.com",
+      url: startUrl,
       active: true,
       webviewLabel: `webview-${timestamp}`,
-      history: ["https://www.google.com"],
+      history: [startUrl],
       historyIndex: 0,
     };
 
@@ -273,6 +276,58 @@ function App() {
 
   // Removed URL polling; rely on webview-navigated events instead
 
+  // Store refs to access latest values without re-subscribing
+  const stateRef = useRef(state);
+  const navigateActiveTabRef = useRef(navigateActiveTab);
+  const createNewTabRef = useRef(createNewTab);
+
+  // Update refs when values change
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    navigateActiveTabRef.current = navigateActiveTab;
+  }, [navigateActiveTab]);
+
+  useEffect(() => {
+    createNewTabRef.current = createNewTab;
+  }, [createNewTab]);
+
+  // Handle deep link URL opening (always open in a new tab)
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    const openUrls = (urls: string[]) => {
+      for (const raw of urls) {
+        const url = raw.trim();
+        // Always open incoming links in a fresh tab, per app policy
+        createNewTabRef.current(url);
+      }
+    };
+
+    (async () => {
+      try {
+        // If the app was launched by a link, handle it immediately:
+        const initial = await getCurrent(); // may be null
+        if (initial?.length) {
+          openUrls(initial);
+        }
+
+        // Handle subsequent links while the app is running:
+        unlisten = await onOpenUrl((urls) => openUrls(urls));
+      } catch (error) {
+        console.error("[Frontend] Deep link setup error:", error);
+      }
+    })();
+
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, []);
+
   // Update navigation state based on history
   useEffect(() => {
     if (!activeTab) {
@@ -299,6 +354,26 @@ function App() {
         currentUrl={activeTab?.url || ""}
         onBack={handleBack}
         onForward={handleForward}
+        onMakeDefaultBrowser={async () => {
+          console.log("[Frontend] Make Default: clicked");
+          try {
+            console.log(
+              "[Frontend] Make Default: invoking set_default_browser..."
+            );
+            await invoke("set_default_browser", {
+              bundleId: "com.brsr.browser",
+            });
+            console.log("[Frontend] Make Default: invoke completed");
+            // eslint-disable-next-line no-alert
+            alert(
+              "Requested default change. If no dialog appeared, check System Settings or another Space — the system consent window can open behind other apps."
+            );
+          } catch (error) {
+            console.error("[Frontend] Failed to set default browser:", error);
+            // eslint-disable-next-line no-alert
+            alert(`Could not set default browser: ${error}`);
+          }
+        }}
         onNavigate={navigateActiveTab}
         onReload={handleReload}
       />

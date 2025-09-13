@@ -139,7 +139,12 @@ export function TabStrip({
             </Button>
           </div>
         ))}
-        <Button onClick={onNewTab} size="icon" type="button" variant="ghost">
+        <Button
+          onClick={() => onNewTab()}
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
           <Plus className="h-4 w-4" />
         </Button>
       </div>

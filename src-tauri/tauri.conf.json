@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "brsr",
-  "version": "0.0.1",
-  "identifier": "com.brsr.app",
+  "version": "0.0.2",
+  "identifier": "com.brsr.browser",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",
@@ -42,5 +42,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["http", "https"]
+      }
+    }
   }
 }

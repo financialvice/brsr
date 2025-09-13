@@ -1,0 +1,11 @@
+[env]
+# Ensure we use Apple's clang for building Objective‑C/C helpers on macOS
+CC = "clang"
+CXX = "clang++"
+
+[target.aarch64-apple-darwin]
+linker = "clang"
+
+[target.x86_64-apple-darwin]
+linker = "clang"
+
