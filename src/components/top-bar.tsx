@@ -1,5 +1,8 @@
+import { ArrowLeft, ArrowRight, RotateCw } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useIsMac } from "../hooks/use-is-mac";
 
 interface TopBarProps {
@@ -44,49 +47,47 @@ export function TopBar({
 
   return (
     <div
-      className={`drag relative flex h-12 items-center space-x-2 border-gray-200 border-b px-3 ${leftPadding}`}
+      className={`drag relative flex h-12 items-center space-x-2 border-b px-3 ${leftPadding}`}
       data-tauri-drag-region
     >
       {/* Left drag spacer (empty background only) */}
       <div aria-hidden className="h-8 w-2" data-tauri-drag-region />
-      <button
-        className={`no-drag rounded p-1.5 ${
-          canGoBack
-            ? "cursor-pointer text-gray-700 hover:bg-gray-200/50"
-            : "cursor-not-allowed text-gray-400"
-        }`}
+      <Button
+        className="no-drag"
         disabled={!canGoBack}
         onClick={onBack}
+        size="icon"
         title="Back"
         type="button"
+        variant="ghost"
       >
-        ←
-      </button>
-      <button
-        className={`no-drag rounded p-1.5 ${
-          canGoForward
-            ? "cursor-pointer text-gray-700 hover:bg-gray-200/50"
-            : "cursor-not-allowed text-gray-400"
-        }`}
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <Button
+        className="no-drag"
         disabled={!canGoForward}
         onClick={onForward}
+        size="icon"
         title="Forward"
         type="button"
+        variant="ghost"
       >
-        →
-      </button>
-      <button
-        className="no-drag rounded p-1.5 text-gray-700 hover:bg-gray-200/50"
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+      <Button
+        className="no-drag"
         onClick={onReload}
+        size="icon"
         title="Reload"
         type="button"
+        variant="ghost"
       >
-        ↻
-      </button>
+        <RotateCw className="h-4 w-4" />
+      </Button>
 
       <form className="no-drag flex-1" onSubmit={handleSubmit}>
-        <input
-          className="w-full rounded-md border border-gray-300 bg-white/50 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <Input
+          className="no-drag bg-background/50"
           onChange={(e) => setUrlInput(e.target.value)}
           placeholder="Enter URL..."
           type="text"

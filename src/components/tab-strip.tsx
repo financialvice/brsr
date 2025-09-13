@@ -1,4 +1,6 @@
+import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import type { Tab } from "../types";
 
 const getPrimaryFavicon = (url: string): string | null => {
@@ -100,14 +102,14 @@ export function TabStrip({
   onNewTab,
 }: TabStripProps) {
   return (
-    <div className="flex shrink-0 items-center overflow-x-auto border-gray-200 border-b px-2 py-1">
+    <div className="flex shrink-0 items-center overflow-x-auto border-b px-2 py-1">
       <div className="flex items-center space-x-1">
         {tabs.map((tab) => (
           <div
             className={`flex cursor-pointer items-center rounded-t-lg px-3 py-1.5 ${
               tab.id === activeTabId
-                ? "border-gray-300 border-t border-r border-l bg-white/70 font-semibold"
-                : "border border-transparent bg-white/30 hover:bg-white/50"
+                ? "border-t border-r border-l bg-card/70 font-semibold"
+                : "border border-transparent bg-card/30 hover:bg-card/50"
             }min-w-[120px] max-w-[200px]`}
             key={tab.id}
             onClick={() => onTabClick(tab.id)}
@@ -123,25 +125,23 @@ export function TabStrip({
             <span className="flex-1 truncate text-sm">
               {tab.title || "New Tab"}
             </span>
-            <button
-              className="ml-2 text-gray-500 text-xs hover:text-gray-700"
+            <Button
+              className="ml-2 h-auto p-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 onTabClose(tab.id);
               }}
+              size="icon"
               type="button"
+              variant="ghost"
             >
-              ✕
-            </button>
+              <X className="h-3 w-3" />
+            </Button>
           </div>
         ))}
-        <button
-          className="rounded px-2 py-1 text-gray-600 hover:bg-gray-200/50"
-          onClick={onNewTab}
-          type="button"
-        >
-          +
-        </button>
+        <Button onClick={onNewTab} size="icon" type="button" variant="ghost">
+          <Plus className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );

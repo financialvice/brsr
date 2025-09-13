@@ -26,6 +26,8 @@
     "core:webview:allow-set-webview-position",
     "core:webview:allow-set-webview-size",
 
+    "core:app:allow-set-app-theme",
+
     "decorum:allow-show-snap-overlay"
   ]
 }

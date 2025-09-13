@@ -198,7 +198,7 @@ export function WebviewContainer({ tabs, activeTabId }: WebviewContainerProps) {
   return (
     <div className="relative flex-1 bg-transparent" ref={containerRef}>
       {tabs.length === 0 && (
-        <div className="flex h-full items-center justify-center text-gray-500">
+        <div className="flex h-full items-center justify-center text-muted-foreground">
           Click + to create a new tab
         </div>
       )}

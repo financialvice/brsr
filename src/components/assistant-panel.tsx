@@ -1,5 +1,9 @@
 import { listen } from "@tauri-apps/api/event";
+import { Laptop, Moon, Sun } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { ThemeChoice } from "@/lib/theme";
+import { applyTheme, getCurrentTheme, initTheme } from "@/lib/theme";
 
 type TelemetryEvent =
   | {
@@ -258,6 +262,7 @@ export function AssistantPanel({
   activeWebviewLabel: string | null;
 }) {
   const [byLabel, setByLabel] = useState<Record<string, PanelState>>({});
+  const [theme, setTheme] = useState<ThemeChoice>("system");
 
   useEffect(() => {
     const unlisten = listen<TelemetryEvent>("webview-telemetry", (event) => {
@@ -274,6 +279,12 @@ export function AssistantPanel({
     };
   }, []);
 
+  useEffect(() => {
+    initTheme().then(() => {
+      setTheme(getCurrentTheme());
+    });
+  }, []);
+
   const state = useMemo<PanelState | null>(() => {
     if (!activeWebviewLabel) {
       return null;
@@ -282,34 +293,63 @@ export function AssistantPanel({
   }, [byLabel, activeWebviewLabel]);
 
   return (
-    <aside className="flex w-[320px] min-w-[320px] flex-col border-gray-200 border-l p-0">
-      <div className="shrink-0 border-gray-200 border-b p-3">
+    <aside className="flex w-[320px] min-w-[320px] flex-col border-l p-0">
+      <div className="shrink-0 border-b p-3">
         <h2 className="font-semibold text-lg">Assistant</h2>
+        <div className="mt-3">
+          <ToggleGroup
+            className="justify-start"
+            onValueChange={async (value) => {
+              if (value) {
+                const newTheme = value as ThemeChoice;
+                setTheme(newTheme);
+                await applyTheme(newTheme);
+              }
+            }}
+            type="single"
+            value={theme}
+          >
+            <ToggleGroupItem aria-label="System theme" value="system">
+              <Laptop className="h-4 w-4" />
+              <span className="ml-2">System</span>
+            </ToggleGroupItem>
+            <ToggleGroupItem aria-label="Light theme" value="light">
+              <Sun className="h-4 w-4" />
+              <span className="ml-2">Light</span>
+            </ToggleGroupItem>
+            <ToggleGroupItem aria-label="Dark theme" value="dark">
+              <Moon className="h-4 w-4" />
+              <span className="ml-2">Dark</span>
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
       </div>
       <div className="max-h-100 flex-1 overflow-y-auto p-4">
         {!activeWebviewLabel && (
-          <div className="text-gray-500 text-sm">
+          <div className="text-muted-foreground text-sm">
             Open a tab to see page insights.
           </div>
         )}
         {activeWebviewLabel && !state && (
-          <div className="text-gray-500 text-sm">Waiting for telemetry…</div>
+          <div className="text-muted-foreground text-sm">
+            Waiting for telemetry…
+          </div>
         )}
         {state && (
           <div className="space-y-4">
             <section>
-              <div className="text-gray-500 text-sm">Page</div>
+              <div className="text-muted-foreground text-sm">Page</div>
               <div className="truncate font-medium">
                 {state.pageTitle || "(no title)"}
               </div>
               <div
-                className="truncate text-gray-500 text-xs"
+                className="truncate text-muted-foreground text-xs"
                 title={state.pageUrl}
               >
                 {state.pageUrl || ""}
               </div>
               {Boolean(state.metas.description) && (
-                <p className="mt-2 line-clamp-4 text-gray-600 text-sm">
+                <p className="mt-2 line-clamp-4 text-muted-foreground text-sm">
                   {state.metas.description}
                 </p>
               )}
@@ -317,15 +357,17 @@ export function AssistantPanel({
 
             {state.selection && (
               <section>
-                <div className="text-gray-500 text-sm">Selection</div>
-                <blockquote className="mt-1 rounded bg-gray-50 p-2 text-sm">
+                <div className="text-muted-foreground text-sm">Selection</div>
+                <blockquote className="mt-1 rounded bg-muted p-2 text-sm">
                   {state.selection}
                 </blockquote>
               </section>
             )}
 
             <section>
-              <div className="mb-1 text-gray-500 text-sm">Network (latest)</div>
+              <div className="mb-1 text-muted-foreground text-sm">
+                Network (latest)
+              </div>
               <ul className="space-y-1">
                 {state.requests
                   .slice(-8)
@@ -335,16 +377,19 @@ export function AssistantPanel({
                       <span className="font-medium">
                         {r.type.toUpperCase()}
                       </span>
-                      <span className="text-gray-500">
+                      <span className="text-muted-foreground">
                         {" "}
                         {r.method ? `${r.method} ` : ""}
                       </span>
                       <span className="truncate">{r.url}</span>
                       {typeof r.status === "number" && (
-                        <span className="text-gray-500"> · {r.status}</span>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {r.status}
+                        </span>
                       )}
                       {typeof r.duration === "number" && (
-                        <span className="text-gray-500">
+                        <span className="text-muted-foreground">
                           {" "}
                           · {Math.round(r.duration)}ms
                         </span>
@@ -352,7 +397,7 @@ export function AssistantPanel({
                     </li>
                   ))}
                 {state.requests.length === 0 && (
-                  <li className="text-gray-500 text-xs">
+                  <li className="text-muted-foreground text-xs">
                     No requests observed yet.
                   </li>
                 )}
@@ -360,7 +405,7 @@ export function AssistantPanel({
             </section>
 
             <section>
-              <div className="mb-1 text-gray-500 text-sm">Console</div>
+              <div className="mb-1 text-muted-foreground text-sm">Console</div>
               <ul className="space-y-1">
                 {state.logs
                   .slice(-6)
@@ -370,8 +415,8 @@ export function AssistantPanel({
                       <span
                         className={
                           l.level === "error" || l.level === "warn"
-                            ? "text-red-600"
-                            : "text-gray-800"
+                            ? "text-destructive"
+                            : "text-foreground"
                         }
                       >
                         {l.level}
@@ -380,20 +425,22 @@ export function AssistantPanel({
                     </li>
                   ))}
                 {state.logs.length === 0 && (
-                  <li className="text-gray-500 text-xs">No logs yet.</li>
+                  <li className="text-muted-foreground text-xs">
+                    No logs yet.
+                  </li>
                 )}
               </ul>
             </section>
 
             {state.errors.length > 0 && (
               <section>
-                <div className="mb-1 text-gray-500 text-sm">Errors</div>
+                <div className="mb-1 text-muted-foreground text-sm">Errors</div>
                 <ul className="space-y-1">
                   {state.errors
                     .slice(-6)
                     .reverse()
                     .map((e) => (
-                      <li className="text-red-700 text-xs" key={e.id}>
+                      <li className="text-destructive text-xs" key={e.id}>
                         {e.message}
                       </li>
                     ))}

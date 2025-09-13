@@ -5,6 +5,16 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite + React + TS</title>
+    <script>
+      (function () {
+        try {
+          var c = localStorage.getItem('theme-preference');
+          var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = c === 'dark' || (c === null || c === 'system') && systemDark;
+          if (dark) document.documentElement.classList.add('dark');
+        } catch(_) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
