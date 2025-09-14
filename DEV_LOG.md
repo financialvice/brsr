@@ -1,5 +1,45 @@
 # Dev Log
 
+## 2025-09-13 — Webview positioning refactor and 485px minimum height discovery
+
+Problem
+- The webview positioning system was complex and "magic-number-y" with hardcoded values
+- Adding simple Tailwind padding (`p-2`) didn't work as expected
+- Webviews would stop shrinking at exactly 485px height
+
+Investigation findings
+- Discovered that native webviews in Tauri child webviews have an undocumented minimum height of exactly 485px
+- This appears to be a platform-specific constraint (likely from WKWebView on macOS)
+- Native webviews render as OS-level views above the DOM, so CSS `overflow: hidden` cannot clip them
+- The webview overlaps other UI elements (like devtools) when smaller than 485px
+
+Solution shipped
+- Created a new `WebviewSlot` component that:
+  - Measures the content box properly (accounting for padding/borders)
+  - Handles the 485px minimum gracefully by keeping webview at that size
+  - Uses ResizeObserver and MutationObserver for reactive updates
+  - Provides clear separation between container styling and webview positioning
+- Simplified `WebviewContainer` to use the new slot-based approach
+- Added `className` prop support for flexible Tailwind styling
+- Added comprehensive documentation about the constraint
+
+Technical details
+- The `measureContentBox` function properly calculates inner dimensions after padding/border
+- When container height < 485px, we set webview to 485px (it won't accept less)
+- CSS `overflow: hidden` doesn't clip native webviews as they're separate OS views
+- Tested `auto_resize()` from Tauri examples but it didn't solve the constraint
+
+Files changed
+- `src/components/webview-slot.tsx` - New component for webview positioning
+- `src/components/webview-container.tsx` - Simplified to use WebviewSlot
+- `src/app.tsx` - Added `p-2` padding example
+
+Lessons learned
+- Native webview constraints are often undocumented and platform-specific
+- Child webviews in Tauri are OS-level views, not DOM elements
+- Simple is better - our initial implementation was overcomplicated
+- Always test with actual window resizing to discover real constraints
+
 ## 2025-09-13 — macOS overlay titlebar + clickable toolbar
 - Problem: Our back/forward/refresh buttons and URL input were unclickable when placed in the overlay titlebar row on macOS. Double‑clicking the input also maximized the window.
 - Root cause: We were creating a native overlay titlebar view via `tauri-plugin-decorum` (`create_overlay_titlebar` + optional `set_traffic_lights_inset`). That native `NSVisualEffectView` sits above the web content and intercepts mouse events across the whole band; CSS `-webkit-app-region: no-drag` on children cannot override it.

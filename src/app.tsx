@@ -404,7 +404,11 @@ function App() {
       />
 
       <div className="flex flex-1">
-        <WebviewContainer activeTabId={state.activeTabId} tabs={state.tabs} />
+        <WebviewContainer
+          activeTabId={state.activeTabId}
+          className="p-2"
+          tabs={state.tabs}
+        />
         <AssistantPanel activeWebviewLabel={activeTab?.webviewLabel ?? null} />
       </div>
     </div>
