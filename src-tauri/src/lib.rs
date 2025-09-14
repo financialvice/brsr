@@ -1,4 +1,5 @@
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
+use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
 // WebviewWindowExt not used directly; plugin is initialized below
 
 #[cfg(target_os = "macos")]
@@ -748,6 +749,54 @@ pub fn run() {
                 }
             }
             
+            // Application menu (macOS: brsr > Settings…)
+            #[cfg(target_os = "macos")]
+            {
+                // Ensure we have the default macOS menu, then inject Settings… into the Application menu.
+                if app.menu().is_none() {
+                    let default_menu = Menu::default(&app.app_handle())?;
+                    app.set_menu(default_menu)?;
+                }
+
+                if let Some(menu) = app.menu() {
+                    let app_name = app.package_info().name.clone();
+                    // Find the application submenu by comparing the visible text.
+                    if let Ok(items) = menu.items() {
+                        for item in items {
+                            if let MenuItemKind::Submenu(sub) = item {
+                                if let Ok(text) = sub.text() {
+                                    if text == app_name {
+                                        if sub.get("settings").is_none() {
+                                            let settings = MenuItem::with_id(
+                                                app,
+                                                "settings",
+                                                "Settings…",
+                                                true,
+                                                Some("CmdOrCtrl+,"),
+                                            )?;
+                                            // Insert AFTER the first separator (default index 1):
+                                            // About, Separator, [Settings here], Services, …
+                                            let _ = sub.insert(&settings, 2);
+
+                                            // Ensure a separator immediately AFTER Settings
+                                            let sep_after = PredefinedMenuItem::separator(app)?;
+                                            let _ = sub.insert(&sep_after, 3);
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                app.on_menu_event(|app_handle, event| {
+                    if event.id() == "settings" {
+                        let _ = app_handle.emit_to("main", "open-settings", ());
+                    }
+                });
+            }
+
             // List all webviews
             let webviews = main_window.webviews();
             println!("[Rust] Initial webviews count: {}", webviews.len());

@@ -1,9 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
-import { Laptop, Moon, Sun } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { ThemeChoice } from "@/lib/theme";
-import { applyTheme, getCurrentTheme, initTheme } from "@/lib/theme";
 
 type TelemetryEvent =
   | {
@@ -262,7 +258,6 @@ export function AssistantPanel({
   activeWebviewLabel: string | null;
 }) {
   const [byLabel, setByLabel] = useState<Record<string, PanelState>>({});
-  const [theme, setTheme] = useState<ThemeChoice>("system");
 
   useEffect(() => {
     const unlisten = listen<TelemetryEvent>("webview-telemetry", (event) => {
@@ -279,12 +274,6 @@ export function AssistantPanel({
     };
   }, []);
 
-  useEffect(() => {
-    initTheme().then(() => {
-      setTheme(getCurrentTheme());
-    });
-  }, []);
-
   const state = useMemo<PanelState | null>(() => {
     if (!activeWebviewLabel) {
       return null;
@@ -296,33 +285,6 @@ export function AssistantPanel({
     <aside className="flex w-[320px] min-w-[320px] flex-col border-l p-0">
       <div className="shrink-0 border-b p-3">
         <h2 className="font-semibold text-lg">Assistant</h2>
-        <div className="mt-3">
-          <ToggleGroup
-            className="justify-start"
-            onValueChange={async (value) => {
-              if (value) {
-                const newTheme = value as ThemeChoice;
-                setTheme(newTheme);
-                await applyTheme(newTheme);
-              }
-            }}
-            type="single"
-            value={theme}
-          >
-            <ToggleGroupItem aria-label="System theme" value="system">
-              <Laptop className="h-4 w-4" />
-              <span className="ml-2">System</span>
-            </ToggleGroupItem>
-            <ToggleGroupItem aria-label="Light theme" value="light">
-              <Sun className="h-4 w-4" />
-              <span className="ml-2">Light</span>
-            </ToggleGroupItem>
-            <ToggleGroupItem aria-label="Dark theme" value="dark">
-              <Moon className="h-4 w-4" />
-              <span className="ml-2">Dark</span>
-            </ToggleGroupItem>
-          </ToggleGroup>
-        </div>
       </div>
       <div className="max-h-100 flex-1 overflow-y-auto p-4">
         {!activeWebviewLabel && (

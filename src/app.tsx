@@ -4,6 +4,7 @@ import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppSidebar } from "./components/app-sidebar";
 import { AssistantPanel } from "./components/assistant-panel";
+import { SettingsDialog } from "./components/settings-dialog";
 import { TabStrip } from "./components/tab-strip";
 import { TopBar } from "./components/top-bar";
 import { SidebarProvider } from "./components/ui/sidebar";
@@ -13,6 +14,7 @@ import {
   useIsDefaultBrowser,
   waitForDefaultChange,
 } from "./hooks/use-is-default-browser";
+import { initTheme } from "./lib/theme";
 import type { BrowserState, Tab } from "./types";
 
 function App() {
@@ -304,6 +306,23 @@ function App() {
     createNewTabRef.current = createNewTab;
   }, [createNewTab]);
 
+  // Initialize theme and register Cmd+, shortcut to open Settings
+  useEffect(() => {
+    initTheme().catch(() => {
+      // Ignore theme init errors (e.g., localStorage)
+    });
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey && e.key === ",") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("open-settings"));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
   // Handle deep link URL opening (always open in a new tab)
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -419,6 +438,7 @@ function App() {
           />
         </div>
         <AssistantPanel activeWebviewLabel={activeTab?.webviewLabel ?? null} />
+        <SettingsDialog />
       </div>
     </SidebarProvider>
   );

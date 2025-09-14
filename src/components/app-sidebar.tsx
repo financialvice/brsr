@@ -1,4 +1,5 @@
-import { Home } from "lucide-react";
+import { Home, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -35,7 +36,20 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="px-2 py-2 text-muted-foreground text-sm">footer</div>
+        <div className="px-2 py-2">
+          <Button
+            className="w-full justify-start"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("open-settings"));
+            }}
+            type="button"
+            variant="ghost"
+          >
+            <Settings />
+            <span>Settings…</span>
+            <span className="ml-auto text-muted-foreground text-xs">⌘ ,</span>
+          </Button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
