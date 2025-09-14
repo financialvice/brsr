@@ -2,9 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AppSidebar } from "./components/app-sidebar";
 import { AssistantPanel } from "./components/assistant-panel";
 import { TabStrip } from "./components/tab-strip";
 import { TopBar } from "./components/top-bar";
+import { SidebarProvider } from "./components/ui/sidebar";
 import { UpdateBanner } from "./components/update-banner";
 import { WebviewContainer } from "./components/webview-container";
 import {
@@ -355,65 +357,70 @@ function App() {
   }, [activeTab]);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
-      <TopBar
-        canGoBack={navState.canGoBack}
-        canGoForward={navState.canGoForward}
-        currentUrl={activeTab?.url || ""}
-        onBack={handleBack}
-        onForward={handleForward}
-        onMakeDefaultBrowser={
-          isDefaultBrowser
-            ? undefined
-            : async () => {
-                console.log("[Frontend] Make Default: clicked");
-                try {
-                  console.log(
-                    "[Frontend] Make Default: invoking set_default_browser..."
-                  );
-                  await invoke("set_default_browser", {
-                    bundleId: "com.brsr.browser",
-                  });
-                  console.log("[Frontend] Make Default: invoke completed");
-                  // Begin short-lived watch so the button hides as soon as the user confirms
-                  waitForDefaultChange({ intervalMs: 1000, maxWaitMs: 180_000 })
-                    .then(() => refresh())
-                    .catch((err) =>
+    <SidebarProvider>
+      <div className="flex h-screen w-full overflow-hidden">
+        <AppSidebar />
+        <div className="flex w-full flex-1 flex-col">
+          <TopBar
+            canGoBack={navState.canGoBack}
+            canGoForward={navState.canGoForward}
+            currentUrl={activeTab?.url || ""}
+            onBack={handleBack}
+            onForward={handleForward}
+            onMakeDefaultBrowser={
+              isDefaultBrowser
+                ? undefined
+                : async () => {
+                    console.log("[Frontend] Make Default: clicked");
+                    try {
+                      console.log(
+                        "[Frontend] Make Default: invoking set_default_browser..."
+                      );
+                      await invoke("set_default_browser", {
+                        bundleId: "com.brsr.browser",
+                      });
+                      console.log("[Frontend] Make Default: invoke completed");
+                      // Begin short-lived watch so the button hides as soon as the user confirms
+                      waitForDefaultChange({
+                        intervalMs: 1000,
+                        maxWaitMs: 180_000,
+                      })
+                        .then(() => refresh())
+                        .catch((err) =>
+                          console.error(
+                            "[Frontend] waitForDefaultChange error:",
+                            err
+                          )
+                        );
+                    } catch (error) {
                       console.error(
-                        "[Frontend] waitForDefaultChange error:",
-                        err
-                      )
-                    );
-                } catch (error) {
-                  console.error(
-                    "[Frontend] Failed to set default browser:",
-                    error
-                  );
-                }
-              }
-        }
-        onNavigate={navigateActiveTab}
-        onReload={handleReload}
-      />
-      <UpdateBanner />
+                        "[Frontend] Failed to set default browser:",
+                        error
+                      );
+                    }
+                  }
+            }
+            onNavigate={navigateActiveTab}
+            onReload={handleReload}
+          />
+          <UpdateBanner />
 
-      <TabStrip
-        activeTabId={state.activeTabId}
-        onNewTab={createNewTab}
-        onTabClick={selectTab}
-        onTabClose={closeTab}
-        tabs={state.tabs}
-      />
-
-      <div className="flex flex-1">
-        <WebviewContainer
-          activeTabId={state.activeTabId}
-          className="p-2"
-          tabs={state.tabs}
-        />
+          <TabStrip
+            activeTabId={state.activeTabId}
+            onNewTab={createNewTab}
+            onTabClick={selectTab}
+            onTabClose={closeTab}
+            tabs={state.tabs}
+          />
+          <WebviewContainer
+            activeTabId={state.activeTabId}
+            className="p-2"
+            tabs={state.tabs}
+          />
+        </div>
         <AssistantPanel activeWebviewLabel={activeTab?.webviewLabel ?? null} />
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
 
