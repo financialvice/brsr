@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AssistantPanel } from "./components/assistant-panel";
 import { TabStrip } from "./components/tab-strip";
 import { TopBar } from "./components/top-bar";
+import { UpdateBanner } from "./components/update-banner";
 import { WebviewContainer } from "./components/webview-container";
 import {
   useIsDefaultBrowser,
@@ -394,6 +395,7 @@ function App() {
         onNavigate={navigateActiveTab}
         onReload={handleReload}
       />
+      <UpdateBanner />
 
       <TabStrip
         activeTabId={state.activeTabId}

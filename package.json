@@ -14,12 +14,21 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "clean": "rm -rf node_modules dist src-tauri/target"
+    "clean": "rm -rf node_modules dist src-tauri/target",
+    "version": "node scripts/bump-version.js",
+    "version:patch": "node scripts/bump-version.js patch",
+    "version:minor": "node scripts/bump-version.js minor",
+    "version:major": "node scripts/bump-version.js major",
+    "release:patch": "node scripts/bump-version.js patch --tag --push",
+    "release:minor": "node scripts/bump-version.js minor --tag --push",
+    "release:major": "node scripts/bump-version.js major --tag --push"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
     "@tauri-apps/api": "2.8.0",
     "@tauri-apps/plugin-deep-link": "2",
+    "@tauri-apps/plugin-process": "2",
+    "@tauri-apps/plugin-updater": "2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
