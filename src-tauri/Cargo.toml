@@ -1,6 +1,6 @@
 [package]
 name = "brsr"
-version = "0.0.2"
+version = "0.0.3"
 description = "A Generative Browser"
 authors = ["cam"]
 edition = "2021"
